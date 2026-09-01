@@ -896,7 +896,7 @@ int main(int argc, char** argv) {
 
             if (result == false) {
                 fmt::print(stderr, "Error recompiling {}\n", new_func.name);
-                std::exit(EXIT_FAILURE);
+                failed_function_names.push_back(new_func.name);
             }
         }
     }
