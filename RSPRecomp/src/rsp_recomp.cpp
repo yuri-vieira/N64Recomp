@@ -133,6 +133,10 @@ uint32_t expected_c0_reg_value(int cop0_reg) {
         return 0; // Always acquire the semaphore
     case Cop0Reg::RSP_COP0_DPC_STATUS:
         return 0; // Good enough for the microcodes that would be recompiled (i.e. non-graphics ones)
+    case Cop0Reg::RSP_COP0_DPC_CURRENT:
+        return 0; // Stubbed for graphics microcode polling loops; matches the other DMA/RDP status stubs above
+    case Cop0Reg::RSP_COP0_DPC_END:
+        return 0; // Stubbed, same as DPC_CURRENT above
     default:
         fmt::print(stderr, "Unhandled mfc0: {}\n", cop0_reg);
         throw std::runtime_error("Unhandled mfc0");
@@ -154,6 +158,12 @@ std::string_view c0_reg_write_action(int cop0_reg) {
         return "DO_DMA_READ";
     case Cop0Reg::RSP_COP0_SP_WR_LEN:
         return "DO_DMA_WRITE";
+    case Cop0Reg::RSP_COP0_DPC_START:
+        return "SET_RDP_START"; // Graphics microcode handing a command buffer start off to the RDP; runtime macro not implemented yet
+    case Cop0Reg::RSP_COP0_DPC_END:
+        return "SET_RDP_END"; // Graphics microcode handing a command buffer end off to the RDP; runtime macro not implemented yet
+    case Cop0Reg::RSP_COP0_DPC_STATUS:
+        return ""; // Ignore writes to RDP status flags, same as SP_STATUS above
     default:
         fmt::print(stderr, "Unhandled mtc0: {}\n", cop0_reg);
         throw std::runtime_error("Unhandled mtc0");
