@@ -732,6 +732,7 @@ int main(int argc, char** argv) {
     std::vector<size_t> export_function_indices{};
 
     bool failed_strict_mode = false;
+    std::vector<std::string> failed_function_names{};
 
     //#pragma omp parallel for
     for (size_t i = 0; i < context.functions.size(); i++) {
@@ -783,11 +784,19 @@ int main(int argc, char** argv) {
             }
             if (result == false) {
                 fmt::print(stderr, "Error recompiling {}\n", func.name);
-                std::exit(EXIT_FAILURE);
+                failed_function_names.push_back(func.name);
             }
         } else if (func.reimplemented) {
             fmt::print(func_header_file,
                        "void {}(uint8_t* rdram, recomp_context* ctx);\n", func.name);
+        }
+    }
+
+    if (!failed_function_names.empty()) {
+        fmt::print(stderr, "\n{} function(s) failed to recompile (see errors above for each). Continuing with the rest.\n", failed_function_names.size());
+        std::ofstream failed_list_file(config.output_func_path / "failed_functions.txt");
+        for (const std::string& name : failed_function_names) {
+            failed_list_file << name << "\n";
         }
     }
 

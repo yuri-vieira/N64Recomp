@@ -314,14 +314,58 @@ bool N64Recomp::analyze_function(const N64Recomp::Context& context, const N64Rec
             end_address = stats.jump_tables[i + 1].vram;
         }
 
-        // TODO this assumes that the jump table is in the same section as the function itself
-        cur_jtbl.rom = cur_jtbl.vram + func.rom - func.vram;
-        cur_jtbl.section_index = func.section_index;
+        // The jump table's data doesn't necessarily live in the same section
+        // as the function that references it (e.g. a .rodata/.data section
+        // separate from .text), despite what the rest of this function
+        // historically assumed. Find whichever section actually contains
+        // the table's address and use that section's rom/vram mapping
+        // instead of blindly reusing the calling function's section.
+        const Section* jtbl_section = section;
+        for (const Section& candidate : context.sections) {
+            if (cur_jtbl.vram >= candidate.ram_addr && cur_jtbl.vram < candidate.ram_addr + candidate.size) {
+                jtbl_section = &candidate;
+                break;
+            }
+        }
+
+        // Bound the scan by the nearest known symbol (function or data) in
+        // the jump table's own section that starts after it. Without this,
+        // a jump table with no following jump table in the same function
+        // (the common case) has no real upper bound other than "the next
+        // entry doesn't look like a valid address within this function",
+        // which can spuriously terminate early (or, prior to adding this,
+        // run off past all known symbols entirely).
+        for (uint32_t addr : jtbl_section->function_addrs) {
+            if (addr > cur_jtbl.vram && addr < end_address) {
+                end_address = addr;
+            }
+        }
+        // Also never read past the end of the section itself.
+        uint32_t section_end = jtbl_section->ram_addr + jtbl_section->size;
+        if (section_end < end_address) {
+            end_address = section_end;
+        }
+
+        cur_jtbl.rom = cur_jtbl.vram + jtbl_section->rom_addr - jtbl_section->ram_addr;
+        cur_jtbl.section_index = static_cast<uint16_t>(jtbl_section - context.sections.data());
 
         while (vram < end_address) {
             // Retrieve the current entry of the jump table
-            // TODO same as above
-            uint32_t rom_addr = vram + func.rom - func.vram;
+            uint32_t rom_addr = vram + jtbl_section->rom_addr - jtbl_section->ram_addr;
+
+            // When a function's last (or only) jump table has no subsequent
+            // jump table to bound it, end_address stays unbounded (-1) and
+            // this loop only stops once it reads an entry that doesn't look
+            // like a valid address within the function. That can run past
+            // the end of the rom buffer entirely before hitting such an
+            // entry (e.g. reading into unrelated/garbage data that happens
+            // to coincidentally decode as several more in-range addresses).
+            // Bail out once we'd read past the rom buffer instead of
+            // reading out of bounds.
+            if (rom_addr + sizeof(uint32_t) > context.rom.size()) {
+                break;
+            }
+
             uint32_t jtbl_word = byteswap(*reinterpret_cast<const uint32_t*>(&context.rom[rom_addr]));
 
             if (cur_jtbl.got_offset.has_value() && got_ram_addr.has_value()) {
@@ -330,8 +374,18 @@ bool N64Recomp::analyze_function(const N64Recomp::Context& context, const N64Rec
                 jtbl_word += got_ram_addr.value();
             }
 
-            // Check if the entry is a valid address in the current function
-            if (jtbl_word < func.vram || jtbl_word >= func.vram + func.words.size() * sizeof(func.words[0])) {
+            // Check if the entry looks like a valid code address. This used
+            // to require the target be within the *calling function's* own
+            // narrow instruction range, but case handlers for a switch can
+            // legitimately live outside the boundaries of a small/split
+            // function symbol (e.g. a shared default-case handler in a
+            // neighboring function). Accept anything within the calling
+            // function's section instead -- the end_address bound computed
+            // above (nearest following known symbol) already keeps this
+            // loop from running away, so this is just picking the actual
+            // table length within that already-safe window.
+            const Section& func_section = context.sections[func.section_index];
+            if (jtbl_word < func_section.ram_addr || jtbl_word >= func_section.ram_addr + func_section.size) {
                 // If it's not then this is the end of the jump table
                 break;
             }
