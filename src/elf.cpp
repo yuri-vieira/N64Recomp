@@ -43,6 +43,14 @@ bool read_symbols(N64Recomp::Context& context, const ELFIO::elfio& elf_file, ELF
         symbols.get_symbol(sym_index, name, value, size, bind, type,
             section_index, other);
 
+        // spimdisasm emits ambiguous local labels it can't confidently name
+        // as functions with a leading '.' (e.g. ".L15029BA0"), which is
+        // valid in assembly but not a legal C identifier. Sanitize it so
+        // the recompiled output can actually be compiled.
+        if (!name.empty() && name[0] == '.') {
+            name[0] = 'L';
+        }
+
         if (section_index == ELFIO::SHN_ABS && elf_config.use_absolute_symbols) {
             uint32_t vram = static_cast<uint32_t>(value);
             context.functions_by_vram[vram].push_back(context.functions.size());
