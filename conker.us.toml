@@ -1,0 +1,16 @@
+# First-pass N64Recomp config for Conker's Bad Fur Day (US), pointing directly
+# at the ELF our decomp toolchain already produces (build/conker.us.sized.elf).
+
+[input]
+entrypoint = 0x80001000
+output_func_path = "RecompiledFuncs"
+elf_path = "../conker/conker/build/conker.us.sized.elf"
+rom_file_path = "../conker/conker/conker.us.bin"
+
+[patches]
+stubs = [
+    # Data misclassified as code (disassembles to INVALID/garbage
+    # instructions, including a write to $zero which N64Recomp can't
+    # translate as valid C). Needs proper decomp attention later.
+    "hdwrBugFlag",
+]
