@@ -423,6 +423,18 @@ bool process_instruction(GeneratorType& generator, const N64Recomp::Context& con
                 print_indent();
                 generator.emit_cop0_status_read(rt);
                 break;
+            // TLB setup registers (used by OS boot code that manages its own
+            // virtual memory mappings, e.g. Conker's TLB-mapped segments).
+            // Modeled as plain scratch storage in recomp_context rather than
+            // real hardware semantics -- see cop0_reg_read/cop0_reg_write.
+            case Cop0Reg::COP0_Index:
+            case Cop0Reg::COP0_EntryLo0:
+            case Cop0Reg::COP0_EntryLo1:
+            case Cop0Reg::COP0_PageMask:
+            case Cop0Reg::COP0_EntryHi:
+                print_indent();
+                generator.emit_cop0_common_read((int)reg, rt);
+                break;
             default:
                 fmt::print(stderr, "Unhandled cop0 register in mfc0: {}\n", (int)reg);
                 return false;
@@ -437,12 +449,32 @@ bool process_instruction(GeneratorType& generator, const N64Recomp::Context& con
                 print_indent();
                 generator.emit_cop0_status_write(rt);
                 break;
+            case Cop0Reg::COP0_Index:
+            case Cop0Reg::COP0_EntryLo0:
+            case Cop0Reg::COP0_EntryLo1:
+            case Cop0Reg::COP0_PageMask:
+            case Cop0Reg::COP0_EntryHi:
+                print_indent();
+                generator.emit_cop0_common_write((int)reg, rt);
+                break;
             default:
                 fmt::print(stderr, "Unhandled cop0 register in mtc0: {}\n", (int)reg);
                 return false;
             }
             break;
         }
+    case InstrId::cpu_tlbwi:
+        print_indent();
+        generator.emit_tlbwi();
+        break;
+    case InstrId::cpu_tlbwr:
+        print_indent();
+        generator.emit_tlbwr();
+        break;
+    case InstrId::cpu_tlbp:
+        print_indent();
+        generator.emit_tlbp();
+        break;
     // Arithmetic
     case InstrId::cpu_add:
     case InstrId::cpu_addu:

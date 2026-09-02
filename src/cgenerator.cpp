@@ -501,6 +501,26 @@ void N64Recomp::CGenerator::emit_cop0_status_write(int reg) const {
     fmt::print(output_file, "cop0_status_write(ctx, {});", gpr_to_string(reg));
 }
 
+void N64Recomp::CGenerator::emit_cop0_common_read(int cop0_reg, int reg) const {
+    fmt::print(output_file, "{} = cop0_reg_read(ctx, {});\n", gpr_to_string(reg), cop0_reg);
+}
+
+void N64Recomp::CGenerator::emit_cop0_common_write(int cop0_reg, int reg) const {
+    fmt::print(output_file, "cop0_reg_write(ctx, {}, {});", cop0_reg, gpr_to_string(reg));
+}
+
+void N64Recomp::CGenerator::emit_tlbwi() const {
+    fmt::print(output_file, "do_tlbwi(ctx);");
+}
+
+void N64Recomp::CGenerator::emit_tlbwr() const {
+    fmt::print(output_file, "do_tlbwr(ctx);");
+}
+
+void N64Recomp::CGenerator::emit_tlbp() const {
+    fmt::print(output_file, "do_tlbp(ctx);");
+}
+
 void N64Recomp::CGenerator::emit_cop1_cs_read(int reg) const {
     fmt::print(output_file, "{} = get_cop1_cs();\n", gpr_to_string(reg));
 }

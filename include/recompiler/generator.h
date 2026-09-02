@@ -53,6 +53,14 @@ namespace N64Recomp {
         virtual void emit_check_nan(int fpr, bool is_double) const = 0;
         virtual void emit_cop0_status_read(int reg) const = 0;
         virtual void emit_cop0_status_write(int reg) const = 0;
+        // Generic cop0 register accessors for registers other than Status
+        // (e.g. Index, EntryLo0, EntryLo1, PageMask, EntryHi -- the TLB
+        // setup registers). cop0_reg is the raw cop0 register number.
+        virtual void emit_cop0_common_read(int cop0_reg, int reg) const = 0;
+        virtual void emit_cop0_common_write(int cop0_reg, int reg) const = 0;
+        virtual void emit_tlbwi() const = 0;
+        virtual void emit_tlbwr() const = 0;
+        virtual void emit_tlbp() const = 0;
         virtual void emit_cop1_cs_read(int reg) const = 0;
         virtual void emit_cop1_cs_write(int reg) const = 0;
         virtual void emit_muldiv(InstrId instr_id, int reg1, int reg2) const = 0;
@@ -90,6 +98,11 @@ namespace N64Recomp {
         void emit_check_nan(int fpr, bool is_double) const final;
         void emit_cop0_status_read(int reg) const final;
         void emit_cop0_status_write(int reg) const final;
+        void emit_cop0_common_read(int cop0_reg, int reg) const final;
+        void emit_cop0_common_write(int cop0_reg, int reg) const final;
+        void emit_tlbwi() const final;
+        void emit_tlbwr() const final;
+        void emit_tlbp() const final;
         void emit_cop1_cs_read(int reg) const final;
         void emit_cop1_cs_write(int reg) const final;
         void emit_muldiv(InstrId instr_id, int reg1, int reg2) const final;

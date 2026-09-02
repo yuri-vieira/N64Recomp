@@ -1718,6 +1718,58 @@ void N64Recomp::LiveGenerator::emit_cop0_status_write(int reg) const {
     sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS2V(P,32), SLJIT_IMM, sljit_sw(inputs.cop0_status_write));
 }
 
+void N64Recomp::LiveGenerator::emit_cop0_common_read(int cop0_reg, int reg) const {
+    // TLB registers are only ever touched by OS boot code, which mods never
+    // contain, so silently skip if the host hasn't wired this up.
+    if (inputs.cop0_reg_read == nullptr) {
+        return;
+    }
+    if (reg != 0) {
+        sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, Registers::ctx, 0);
+        sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R1, 0, SLJIT_IMM, cop0_reg);
+        sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS2(P,P,32), SLJIT_IMM, sljit_sw(inputs.cop0_reg_read));
+        sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(Registers::ctx), get_gpr_context_offset(reg), SLJIT_R0, 0);
+    }
+}
+
+void N64Recomp::LiveGenerator::emit_cop0_common_write(int cop0_reg, int reg) const {
+    if (inputs.cop0_reg_write == nullptr) {
+        return;
+    }
+    sljit_sw src;
+    sljit_sw srcw;
+    get_gpr_values(reg, src, srcw);
+
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, Registers::ctx, 0);
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R1, 0, SLJIT_IMM, cop0_reg);
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R2, 0, src, srcw);
+    sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS3V(P,32,32), SLJIT_IMM, sljit_sw(inputs.cop0_reg_write));
+}
+
+void N64Recomp::LiveGenerator::emit_tlbwi() const {
+    if (inputs.do_tlbwi == nullptr) {
+        return;
+    }
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, Registers::ctx, 0);
+    sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS1V(P), SLJIT_IMM, sljit_sw(inputs.do_tlbwi));
+}
+
+void N64Recomp::LiveGenerator::emit_tlbwr() const {
+    if (inputs.do_tlbwr == nullptr) {
+        return;
+    }
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, Registers::ctx, 0);
+    sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS1V(P), SLJIT_IMM, sljit_sw(inputs.do_tlbwr));
+}
+
+void N64Recomp::LiveGenerator::emit_tlbp() const {
+    if (inputs.do_tlbp == nullptr) {
+        return;
+    }
+    sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, Registers::ctx, 0);
+    sljit_emit_icall(compiler, SLJIT_CALL, SLJIT_ARGS1V(P), SLJIT_IMM, sljit_sw(inputs.do_tlbp));
+}
+
 void N64Recomp::LiveGenerator::emit_cop1_cs_read(int reg) const {
     // Skip the read if the target is the zero register.
     if (reg != 0) {

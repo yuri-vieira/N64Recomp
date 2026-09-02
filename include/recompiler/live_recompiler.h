@@ -70,6 +70,15 @@ namespace N64Recomp {
         uint32_t base_event_index;
         void (*cop0_status_write)(recomp_context* ctx, gpr value);
         gpr (*cop0_status_read)(recomp_context* ctx);
+        // TLB-related cop0 registers/instructions. Only used by OS-level boot
+        // code (e.g. Conker's TLB setup), never by mod game logic, so these
+        // are allowed to be null -- the corresponding emit_* calls no-op if
+        // so rather than requiring every mod host to wire them up.
+        void (*cop0_reg_write)(recomp_context* ctx, int cop0_reg, gpr value) = nullptr;
+        gpr (*cop0_reg_read)(recomp_context* ctx, int cop0_reg) = nullptr;
+        void (*do_tlbwi)(recomp_context* ctx) = nullptr;
+        void (*do_tlbwr)(recomp_context* ctx) = nullptr;
+        void (*do_tlbp)(recomp_context* ctx) = nullptr;
         void (*switch_error)(const char* func, uint32_t vram, uint32_t jtbl);
         void (*do_break)(uint32_t vram);
         recomp_func_t* (*get_function)(int32_t vram);
@@ -122,6 +131,11 @@ namespace N64Recomp {
         void emit_check_nan(int fpr, bool is_double) const final;
         void emit_cop0_status_read(int reg) const final;
         void emit_cop0_status_write(int reg) const final;
+        void emit_cop0_common_read(int cop0_reg, int reg) const final;
+        void emit_cop0_common_write(int cop0_reg, int reg) const final;
+        void emit_tlbwi() const final;
+        void emit_tlbwr() const final;
+        void emit_tlbp() const final;
         void emit_cop1_cs_read(int reg) const final;
         void emit_cop1_cs_write(int reg) const final;
         void emit_muldiv(InstrId instr_id, int reg1, int reg2) const final;
