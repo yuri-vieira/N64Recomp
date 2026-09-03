@@ -1,0 +1,15 @@
+text_offset = 0x2E698
+text_size = 0xE88
+text_address = 0x04001000
+rom_file_path = "../conker/baserom.us.z64"
+output_file_path = "out/ucode_test_2E698.cpp"
+output_function_name = "conker_ucode_2E698"
+# RSPRecomp has no jump-table auto-detection -- its automatic indirect-target
+# discovery only finds jal return addresses. This ucode's real command
+# dispatch (jr $8 in the loop at L_1000) reads targets out of a genuine data
+# table in DMEM, which RSPRecomp can't see statically. Found empirically:
+# every RSP task submitted at runtime hit "Unhandled jump target 0x148C",
+# 100% reproducible, landing in a ~0xBC-byte gap between L_1420 and L_14DC
+# that the generator never emitted code for at all. Add targets here as more
+# are discovered the same way.
+extra_indirect_branch_targets = [0x148C]
