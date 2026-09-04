@@ -120,19 +120,16 @@ L_150A3BAC:
     // only addresses that land within our actual RDRAM buffer.
     ctx->r15 = (((uint32_t)ctx->r14 - 0x80000000u) < 0x20000000u) ? MEM_BU(ctx->r14, 0X0) : 3;""",
     },
-    {
-        "file": "funcs_114.c",
-        "desc": "func_1510E950: guard an unbounded list-walk dereference (part 2/3 -- zero the iteration count at its main init site).",
-        "old": """    // 0x1510EA70: sw          $t1, 0x108($sp)
-    MEM_W(0X108, ctx->r29) = ctx->r9;""",
-        "new": """    // 0x1510EA70: sw          $t1, 0x108($sp)
-    // [patch] This is the iteration count for the L_1510EA9C list-walk loop
-    // below, which dereferences garbage/uninitialized list entries (same
-    // underlying issue as func_15002248/func_15002008 -- see session notes
-    // on progressive/asynchronous level data loading). Force it to 0 to
-    // skip that loop entirely instead of crashing on bad entries.
-    MEM_W(0X108, ctx->r29) = 0;""",
-    },
+    # func_1510E950 part 2/3 (forcing the loop's iteration count to 0) used
+    # to be here. Re-enabling func_150A3A70's real logic revealed why: this
+    # loop is fed by func_150A3A70 (call chain func_10001194 -> func_15007830
+    # -> func_15007B3C -> func_150045C4 -> func_1510E7A4 -> func_1510E950 ->
+    # func_150A3A70 -> recomp_cart_domain_ptr, observed live), which was the
+    # thing actually populating the list this loop walks -- with it disabled,
+    # the list genuinely was empty/garbage, and zeroing the count was masking
+    # that instead of fixing it. Removed now that the real producer is back;
+    # the part 1/3 dereference guard and part 3/3 iteration cap below stay as
+    # safety nets regardless of whether the count is ever wrong again.
     {
         "file": "funcs_114.c",
         "desc": "func_1510E950: guard an unbounded list-walk dereference (part 3/3 -- hard iteration cap as a safety net for paths the count patch doesn't cover).",
