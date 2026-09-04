@@ -132,7 +132,43 @@ L_150A3BAC:
     # safety nets regardless of whether the count is ever wrong again.
     {
         "file": "funcs_114.c",
-        "desc": "func_1510E950: guard an unbounded list-walk dereference (part 3/3 -- hard iteration cap as a safety net for paths the count patch doesn't cover).",
+        "desc": "func_1510E950: declare a shadow loop counter immune to MIPS register clobbering (part 0/3, at function entry).",
+        "old": """RECOMP_FUNC void func_1510E950(uint8_t* rdram, recomp_context* ctx) {
+    uint64_t hi = 0, lo = 0, result = 0;
+    int c1cs = 0;
+    // 0x1510E950: addiu       $sp, $sp, -0x148""",
+        "new": """RECOMP_FUNC void func_1510E950(uint8_t* rdram, recomp_context* ctx) {
+    uint64_t hi = 0, lo = 0, result = 0;
+    int c1cs = 0;
+    // [patch] The L_1510EA9C list-walk loop below counts iterations in
+    // $s3 (ctx->r19), a callee-saved register -- but one of the calls made
+    // per iteration eventually reaches func_150A3A70's coroutine-resume
+    // path (L_150A3F5C), which restores $s0-$s7/$fp/$gp/$ra from its own
+    // saved state as part of a real, intentional suspend/resume mechanism
+    // unrelated to this function's use of $s3 as a plain loop counter.
+    // That clobbers ctx->r19 out from under this loop the moment the real
+    // per-entry count (now correctly non-zero after func_150A3A70 was
+    // re-enabled) exceeds 0, so the loop never recognizes it reached its
+    // real, small target and only stops via the iteration-cap safety net
+    // below. A shadow counter that plain C++ scope rules keep safe from
+    // whatever the recompiled callee does to MIPS registers sidesteps the
+    // register-sharing conflict without needing to change the coroutine's
+    // own (real, intentional) register semantics.
+    uint32_t list_walk_shadow_counter = 0;
+    // 0x1510E950: addiu       $sp, $sp, -0x148""",
+    },
+    {
+        "file": "funcs_114.c",
+        "desc": "func_1510E950: reset the shadow loop counter alongside $s3 (part 0.5/3, at the loop's entry point).",
+        "old": """    // 0x1510EA34: or          $s3, $zero, $zero
+    ctx->r19 = 0 | 0;""",
+        "new": """    // 0x1510EA34: or          $s3, $zero, $zero
+    ctx->r19 = 0 | 0;
+    list_walk_shadow_counter = 0;""",
+    },
+    {
+        "file": "funcs_114.c",
+        "desc": "func_1510E950: guard an unbounded list-walk dereference (part 3/3 -- use the shadow counter for the exit check, plus a hard iteration cap as a safety net for paths the count patch doesn't cover).",
         "old": """    // 0x1510F3DC: addiu       $s3, $s3, 0x1
     ctx->r19 = ADD32(ctx->r19, 0X1);
     // 0x1510F3E0: addiu       $t1, $t2, 0x1
@@ -141,15 +177,22 @@ L_150A3BAC:
     if (ctx->r19 != ctx->r25) {""",
         "new": """    // 0x1510F3DC: addiu       $s3, $s3, 0x1
     ctx->r19 = ADD32(ctx->r19, 0X1);
+    list_walk_shadow_counter++;
     // 0x1510F3E0: addiu       $t1, $t2, 0x1
     ctx->r9 = ADD32(ctx->r10, 0X1);
     // 0x1510F3E4: bne         $s3, $t9, L_1510EA9C
-    // [patch] The 0x108 count patch upstream doesn't cover every path into
-    // this loop, and when it's reached with a stale/garbage count this
-    // effectively never terminates (each iteration is safe now thanks to
-    // the dereference guards above, but the loop itself just spins). Cap
-    // iterations as a hard safety net.
-    if (ctx->r19 != ctx->r25 && ctx->r19 < 100000) {""",
+    // [patch] Two independent issues on this exit check:
+    // 1. $s3 (ctx->r19) is a callee-saved register that a coroutine
+    //    reached from within this loop's body (func_150A3A70's resume
+    //    path) legitimately restores as part of its own state -- see the
+    //    function-entry comment. Use the shadow counter instead, which
+    //    plain C++ scoping keeps safe from whatever the recompiled callee
+    //    does to MIPS registers.
+    // 2. The 0x108 count patch upstream doesn't cover every path into
+    //    this loop, and when it's reached with a stale/garbage count this
+    //    effectively never terminates. Cap iterations as a hard safety
+    //    net regardless of why the natural exit condition might not fire.
+    if (list_walk_shadow_counter != ctx->r25 && list_walk_shadow_counter < 100000) {""",
     },
 ]
 
