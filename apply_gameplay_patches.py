@@ -63,31 +63,19 @@ PATCHES = [
     // process" early-exit path instead of dereferencing bad table data.
     if (1) {""",
     },
-    {
-        "file": "funcs_77.c",
-        "desc": "func_150A3A70: flag-gated section whose 'off' label (L_150A4A94) is outside N64Recomp's detected function boundary (shares labels with static_5_150A49F4 -- likely one real function split by a decomp symbol-boundary gap). Force the flag-off path.",
-        "old": """    // 0x150A3A78: beq         $t0, $zero, L_150A4A94
-    if (ctx->r8 == 0) {
-        // 0x150A3A7C: nop
-
-            goto L_150A4A94;
-    }""",
-        "new": """    // 0x150A3A78: beq         $t0, $zero, L_150A4A94
-    // [patch] Forced to always take the "disabled" branch. This function's
-    // real body scans a variable-length record chain whose data isn't
-    // valid yet (the underlying buffer isn't populated by anything we've
-    // traced -- see D:\\Dev\\ConkerRecomp session notes), causing a wild
-    // pointer crash a few dozen iterations in. Also, L_150A4A94 itself is
-    // outside N64Recomp's detected boundary for this function (a decomp
-    // symbol-boundary issue, not something introduced here) and was
-    // auto-fixed to a plain return, so forcing this branch just makes the
-    // whole function a no-op until the real subsystem is understood.
-    if (1) {
-        // 0x150A3A7C: nop
-
-            goto L_150A4A94;
-    }""",
-    },
+    # func_150A3A70 used to be force-disabled here (its real body scans a
+    # variable-length record chain that crashed on a wild pointer a few
+    # dozen iterations in). Re-enabled: diagnostic logging confirmed the
+    # gating flag (byte at 0x800DBE62, set by func_150038A0) genuinely
+    # reads 1 throughout a normal run -- this subsystem is meant to be
+    # active. The "wild pointer crash" no longer reproduces now that
+    # address translation is hardened (TO_PTR routes through the software
+    # TLB, recomp_mem_addr uses the masked phys value, out-of-range reads
+    # land on a safe scratch page instead of a guard-region fault) --
+    # verified stable (no crash) over multiple runs. L_150A4A94 (the
+    # flag-off target) is outside N64Recomp's detected boundary for this
+    # function, a decomp symbol-boundary gap unrelated to this patch, and
+    # is already handled generically by fix_undefined_labels.py.
     {
         "file": "funcs_118.c",
         "desc": "static_5_150A49F4: companion patch to func_150A3A70 above (shares its labels -- same root cause).",
